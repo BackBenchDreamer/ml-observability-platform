@@ -68,7 +68,7 @@ cp .env.example .env
 # Edit .env with your configuration
 
 # Run service
-python main.py
+python3 main.py
 ```
 
 Service runs on port 8002.

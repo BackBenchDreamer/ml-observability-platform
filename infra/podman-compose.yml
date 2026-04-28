@@ -47,16 +47,63 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+    networks:
+      - ml-obs-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: ml-obs-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - ml-obs-network
+
+  webhook-receiver:
+    build:
+      context: .
+      dockerfile: Dockerfile.webhook
+    container_name: ml-obs-webhook-receiver
+    ports:
+      - "5001:5001"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ALERT_STREAM_NAME: ml-alerts
+      LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - ml-obs-network
@@ -176,6 +223,28 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      inference-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ml-obs-network
+
+  data-generator:
+    build:
+      context: ../data-generator
+      dockerfile: Dockerfile
+    container_name: ml-obs-data-generator
+    working_dir: /app
+    environment:
+      INFERENCE_API_URL: http://inference-api:8001
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STREAM_NAME: ml-events
+      GENERATION_RATE: 10
+      DRIFT_START_AFTER: 300
+      DRIFT_MAGNITUDE: 0.5
+      LOG_LEVEL: INFO
+    depends_on:
       inference-api:
         condition: service_healthy
     restart: unless-stopped

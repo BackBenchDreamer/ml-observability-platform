@@ -1,383 +1,213 @@
 # ML Observability Platform
 
-A phased, event-driven ML observability platform for generating inference events, detecting drift, exposing metrics, and visualizing system behavior.
+![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
+![Prometheus](https://img.shields.io/badge/Prometheus-2.45+-orange.svg)
+![Grafana](https://img.shields.io/badge/Grafana-10.0+-yellow.svg)
 
-## Current Status
+> Production-style ML observability system with real-time drift detection, event streaming, and historical replay capabilities for monitoring machine learning models in production.
 
-- ✅ Phase 1 complete — Infrastructure setup
-- ✅ Phase 2 complete — Data generator service
-- ✅ Phase 3 complete — Inference API
-- ✅ Phase 4 complete — Drift detection service
-- ✅ Phase 5 complete — Monitoring and alerting system
-- ✅ Phase 6 complete — Replay system
+## Overview
 
-Detailed implementation notes are documented per phase:
+This platform provides comprehensive observability for ML systems through event-driven architecture, statistical drift detection, and automated alerting. Built with industry-standard tools (Prometheus, Grafana, Redis Streams), it demonstrates production-ready patterns for monitoring model performance, detecting data drift, and debugging ML failures through historical event replay.
 
-- [Phase 1 Documentation](docs/PHASE_1.md)
-- [Phase 2 Documentation](docs/PHASE_2.md)
-- [Phase 3 Documentation](inference-api/README.md)
-- [Phase 4 Documentation](docs/PHASE_4.md)
-- [Phase 5 Documentation](docs/PHASE_5.md)
-- [Build Specification](docs/BUILD_SPEC.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Technical Decisions](docs/DECISIONS.md)
+**Key Features:**
+- **Real-time Drift Detection** — Statistical analysis (KS test, PSI) on streaming inference events
+- **Event-Driven Architecture** — Redis Streams for reliable event processing with consumer groups
+- **Historical Replay** — PostgreSQL-backed event replay for debugging and model comparison
+- **Comprehensive Monitoring** — Prometheus metrics, Grafana dashboards, and Alertmanager integration
+- **Production Patterns** — Health checks, structured logging, containerized services with Podman
+
+## Architecture
+
+The platform follows a microservices architecture with event streaming at its core:
+
+```
+Data Generator → Inference API → Redis Streams → Drift Service → Prometheus
+                       ↓                              ↓
+                  PostgreSQL                    Alertmanager
+                       ↓                              ↓
+                 Replay Service                 Webhook Receiver
+```
+
+**Key Architectural Decisions:**
+- **Redis Streams** for event backbone (reliable, ordered, consumer groups)
+- **PostgreSQL** for event persistence (JSONB for flexible schema)
+- **FastAPI** for service APIs (async, auto-documentation, type safety)
+- **Prometheus** for metrics (industry standard, powerful querying)
+- **Podman** for containerization (rootless, Docker-compatible)
+
+See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed design and [Technical Decisions](docs/DECISIONS.md) for rationale.
+
+## How It Works
+
+### 1. Prediction Flow
+
+1. **Data Generator** creates synthetic inference requests with configurable drift
+2. **Inference API** receives requests, runs RandomForest model, returns predictions
+3. **Event Publishing** — API publishes prediction events to Redis Stream `ml-events`
+4. **Event Persistence** — Events stored in PostgreSQL for replay capability
+
+### 2. Drift Detection
+
+1. **Baseline Collection** — First 100 events establish reference distributions
+2. **Sliding Window Analysis** — Maintains 100-event window for comparison
+3. **Statistical Testing** — Applies KS test and PSI to detect distribution shifts
+4. **Alert Publishing** — Drift events published to Redis Stream `ml-alerts`
+5. **Metrics Exposure** — Prometheus metrics updated for monitoring
+
+**Drift Thresholds:**
+- PSI (Population Stability Index) > 0.2
+- KS test p-value < 0.05
+
+### 3. Alerting
+
+1. **Prometheus** scrapes metrics from drift-service every 15 seconds
+2. **Alert Rules** evaluate conditions (drift score, latency, throughput)
+3. **Alertmanager** receives, groups, and routes alerts
+4. **Webhook Receiver** logs notifications (extensible for Slack/PagerDuty)
 
 ## Quick Start
 
 ### Prerequisites
 
-- Podman
-- podman-compose
-- Python 3 (for running the data generator locally)
-
-On macOS:
+- Podman and podman-compose
+- Python 3.9+
 
 ```bash
+# macOS installation
 brew install podman podman-compose
 podman machine init
 podman machine start
 ```
 
-### Start Full Stack
+### Run Demo
 
-Start all services with Podman Compose:
+Use the automated demo script for quick validation:
 
 ```bash
+./scripts/demo.sh
+```
+
+The demo script will:
+1. Start all services with podman-compose
+2. Wait for services to become healthy
+3. Generate baseline events (30 seconds)
+4. Generate drift events (30 seconds)
+5. Display drift alerts and metrics
+6. Show Grafana dashboard URLs
+
+**Expected Outcomes:**
+- All services report healthy status
+- Drift alerts appear in Redis Stream `ml-alerts`
+- Prometheus metrics show `ml_drift_score > 0.2`
+- Grafana dashboards display drift detection events
+
+See [Testing Guide](docs/TESTING.md) for detailed testing instructions and validation steps.
+
+### Manual Start
+
+```bash
+# Start all services
 cd infra
-podman-compose -f podman-compose.yml up -d
-```
+podman-compose up -d
 
-Verify all services are healthy:
-
-```bash
+# Verify services are healthy
 podman-compose ps
-```
 
-Wait until all services report `healthy` status (may take 30-60 seconds).
+# Generate events
+cd ../data-generator
+python3 generator.py
+
+# Enable drift
+ENABLE_DRIFT=true python3 generator.py
+```
 
 ### Access Services
 
 - **Grafana**: http://localhost:3000 (admin/admin)
 - **Prometheus**: http://localhost:9090
-- **Inference API**: http://localhost:8001
-- **Drift Service**: http://localhost:8000
-- **Replay Service**: http://localhost:8002
-- **Redis**: `localhost:6379`
-- **PostgreSQL**: `localhost:5432`
+- **Alertmanager**: http://localhost:9093
+- **Inference API**: http://localhost:8001/docs
+- **Drift Service**: http://localhost:8000/metrics
+- **Replay Service**: http://localhost:8002/docs
 
-Default local development credentials:
+## Observability Features
 
-- Grafana: `admin` / `admin`
-- PostgreSQL: `mlobs` / `mlobs_pass`
+### Drift Detection
 
-### Quick Verification
+**Statistical Methods:**
+- **Kolmogorov-Smirnov (KS) Test** — Detects distribution shifts in continuous features
+- **Population Stability Index (PSI)** — Measures distribution divergence
+- **Chi-Square Test** — Monitors prediction label distribution changes
 
-**Check drift service health**:
-```bash
-curl http://localhost:8000/health
+**Monitoring Approach:**
+- Baseline established from first 100 events
+- Sliding window of 100 events for continuous comparison
+- Per-feature drift scoring with configurable thresholds
+- Alert publishing to Redis Streams for downstream processing
+
+**Metrics Exposed:**
+```
+drift_events_processed_total          # Total events processed
+drift_detected_total{feature}         # Drift detections by feature
+drift_psi_score{feature}              # PSI scores per feature
+drift_ks_statistic{feature}           # KS test statistics
+drift_prediction_distribution{label}  # Prediction distribution
+drift_processing_latency_seconds      # Processing time histogram
 ```
 
-**View drift metrics**:
-```bash
-curl http://localhost:8000/metrics
+### Monitoring Dashboards
+
+**Grafana Dashboards** (pre-configured):
+
+1. **ML Drift Monitoring** — Real-time drift scores, detection events, feature distributions
+2. **Prediction Distribution** — Label distribution trends, confidence scores, throughput
+3. **System Health** — Service health, latency percentiles, error rates, resource usage
+
+Access at http://localhost:3000 (admin/admin)
+
+### Alerting System
+
+**Alert Rules:**
+- `HighDriftScore` — Triggers when drift score > 0.2 for 2 minutes
+- `PredictionThroughputDrop` — Triggers when prediction rate drops to 0 for 2 minutes
+- `HighInferenceLatency` — Triggers when P95 latency exceeds 1 second for 2 minutes
+
+**Alert Flow:**
+```
+Prometheus → Alertmanager → Webhook Receiver → [Slack/PagerDuty/Email]
 ```
 
-**Check inference API**:
-```bash
-curl http://localhost:8001/health
-```
-
-**View service logs**:
-```bash
-podman-compose logs -f drift-service
-```
-
-## Run the Data Generator
-
-For detailed setup and configuration, see:
-
-- [Phase 2 Documentation](docs/PHASE_2.md)
-- [Data Generator Service README](data-generator/README.md)
-
-Basic local run:
-
-```bash
-cd data-generator
-pip install -r requirements.txt
-python generator.py
-```
-
-Run with drift enabled:
-
-```bash
-cd data-generator
-ENABLE_DRIFT=true python generator.py
-```
-
-### Verify Events in Redis
-
-```bash
-podman exec ml-obs-redis redis-cli XLEN ml-events
-podman exec ml-obs-redis redis-cli XREAD COUNT 1 STREAMS ml-events 0
-```
-
-## Phase 3: Inference API
-
-FastAPI service that provides ML predictions and publishes events to Redis.
-
-- **Endpoint:** `POST /predict` for inference
-- **Model:** RandomForest classifier with 3 features for binary classification
-- **Eventing:** Automatically publishes prediction events to Redis Stream `ml-events`
-- **Health Check:** `GET /health`
-- **Port:** `8001`
-
-Quick start:
-
-```bash
-cd infra && podman-compose up -d inference-api
-```
-
-Example API call:
-
-```bash
-curl -X POST http://localhost:8001/predict \
-  -H "Content-Type: application/json" \
-  -d '{"feature_1": 0.5, "feature_2": 1.2, "feature_3": 0.8}'
-```
-
-For detailed service documentation, see [`inference-api/README.md`](inference-api/README.md).
-
-## Phase 4: Drift Detection Service ✅
-
-Real-time ML drift detection service with statistical analysis and alerting.
-
-### Features
-
-- ✅ **Statistical Drift Detection**: KS test and PSI for feature distributions
-- ✅ **Prediction Monitoring**: Chi-square test for label distribution changes
-- ✅ **Real-time Alerting**: Publishes alerts to Redis Streams (`ml-alerts`)
-- ✅ **Prometheus Metrics**: Comprehensive metrics for monitoring
-- ✅ **Consumer Groups**: Reliable event processing with acknowledgment
-- ✅ **Dual Format Support**: Handles data-generator and inference-api events
-
-### Endpoints
-
-- **Health Check**: `GET /health` at http://localhost:8000/health
-- **Metrics**: `GET /metrics` at http://localhost:8000/metrics
-
-### Quick Start
-
-**Start with Podman Compose**:
-```bash
-cd infra
-podman-compose up -d drift-service
-```
-
-**View logs**:
-```bash
-podman-compose logs -f drift-service
-```
-
-**Check metrics**:
-```bash
-curl http://localhost:8000/metrics | grep drift
-```
-
-### Drift Detection Workflow
-
-1. **Baseline Collection** (first 100 events):
-   - Collects feature distributions
-   - Establishes reference baseline
-   - No drift detection during this phase
-
-2. **Sliding Window Analysis** (after baseline):
-   - Maintains 100-event sliding window
-   - Compares to baseline using KS test and PSI
-   - Detects drift if PSI > 0.2 OR p-value < 0.05
-
-3. **Alert Publishing**:
-   - Publishes to `ml-alerts` Redis Stream
-   - Includes statistical details and distribution metrics
-
-### Testing Drift Detection
-
-**Generate baseline events**:
-```bash
-cd data-generator
-python3 generator.py
-# Let run for ~30 seconds, then Ctrl+C
-```
-
-**Generate drift events**:
-```bash
-ENABLE_DRIFT=true python3 generator.py
-# Let run for ~30 seconds, then Ctrl+C
-```
-
-**Check for drift alerts**:
-```bash
-podman exec ml-obs-redis redis-cli XREAD COUNT 10 STREAMS ml-alerts 0
-```
-
-### Metrics Exposed
-
-- `drift_events_processed_total` - Total events processed
-- `drift_detected_total{feature, drift_type}` - Drift detections by feature
-- `drift_psi_score{feature}` - PSI scores per feature
-- `drift_ks_statistic{feature}` - KS test statistics
-- `drift_prediction_distribution{label}` - Prediction distribution
-- `drift_processing_latency_seconds` - Processing time histogram
-
-### Configuration
-
-Key environment variables (see [`drift-service/.env.example`](drift-service/.env.example)):
-
-- `BASELINE_WINDOW_SIZE=100` - Baseline sample count
-- `SLIDING_WINDOW_SIZE=100` - Sliding window size
-- `DRIFT_THRESHOLD_PSI=0.2` - PSI drift threshold
-- `DRIFT_THRESHOLD_KS=0.05` - KS test p-value threshold
-
-For comprehensive documentation, see:
-- [Drift Service README](drift-service/README.md) - Service-level documentation
-- [Phase 4 Documentation](docs/PHASE_4.md) - Complete phase implementation details
-
-## Phase 5: Monitoring and Alerting System ✅
-
-Converts passive monitoring into an active alerting system with automated notifications.
-
-### Alert Pipeline Flow
-
-1. **Prometheus** scrapes metrics from drift-service every 15 seconds
-2. **Alert rules** evaluate conditions (drift, latency, throughput)
-3. **Alertmanager** receives and groups alerts
-4. **Webhook receiver** logs alert notifications
-
-### Key Components
-
-- **Prometheus Alert Rules** (`infra/alerts.yml`):
-  - `HighDriftScore`: Triggers when `ml_drift_score > 0.2` for 2 minutes
-  - `PredictionThroughputDrop`: Triggers when prediction rate drops to 0 for 2 minutes
-  - `HighInferenceLatency`: Triggers when P95 latency exceeds 1 second for 2 minutes
-
-- **Alertmanager** (`infra/alertmanager.yml`):
-  - Routes alerts to webhook receiver
-  - Groups alerts by severity and service
-  - Configurable notification channels
-
-- **Webhook Receiver** (`infra/webhook_receiver.py`):
-  - Receives alert notifications from Alertmanager
-  - Logs alert details for debugging
-  - Extensible for Slack, email, or PagerDuty integration
-
-- **Grafana Dashboards** (3 dashboards):
-  - **ML Drift Monitoring**: Real-time drift scores and detection events
-  - **Prediction Distribution**: Prediction label distribution and trends
-  - **System Health**: Service health, latency, and throughput metrics
-
-### How to Test Alerts
-
-**Start the system**:
-```bash
-cd infra
-podman-compose up -d
-```
-
-**Trigger HighDriftScore alert**:
-```bash
-cd data-generator
-ENABLE_DRIFT=true python generator.py
-# Let run for 2+ minutes to trigger alert
-```
-
-**Trigger PredictionThroughputDrop alert**:
-```bash
-# Stop the data-generator
-# Wait 2+ minutes for alert to fire
-```
-
-**Check alerts**:
-- Prometheus alerts: http://localhost:9090/alerts
+Check active alerts:
+- Prometheus: http://localhost:9090/alerts
 - Alertmanager: http://localhost:9093
 - Webhook logs: `podman logs -f webhook-receiver`
 
-### Grafana Dashboards
+## Replay System
 
-Access pre-configured dashboards at http://localhost:3000 (admin/admin):
+### Purpose
 
-- **ML Drift Monitoring**: http://localhost:3000/d/ml-drift-monitor
-- **Prediction Distribution**: http://localhost:3000/d/prediction-dist
-- **System Health**: http://localhost:3000/d/system-health
+The replay system enables debugging of ML failures by replaying historical inference events through the current model version. This allows you to:
 
-For detailed documentation, see [Phase 5 Documentation](docs/PHASE_5.md).
-
-## Phase 6: Replay System ✅
-
-Event replay system for debugging ML failures and comparing model versions.
-
-### Why Replay Matters
-
-When ML models fail in production, you need to:
-- **Reproduce the exact failure** with historical data
+- **Reproduce failures** with exact historical inputs
 - **Compare predictions** between model versions
-- **Debug confidence changes** to understand model behavior
+- **Analyze confidence changes** to understand model behavior
 - **Validate fixes** before redeployment
 
-The replay system stores every inference event in PostgreSQL and allows you to replay them through the current model to see how predictions have changed.
+### How to Use
 
-### System Flow
-
-```
-1. Inference API → PostgreSQL (event persistence)
-   ↓
-2. Replay Service fetches events from PostgreSQL
-   ↓
-3. Replay Service sends features to Inference API
-   ↓
-4. Compare old vs new predictions
-   ↓
-5. Return confidence differences
-```
-
-### Features
-
-- ✅ **PostgreSQL Event Persistence**: All events stored with `request_id` uniqueness
-- ✅ **Batch Replay**: Replay up to 50 events at once
-- ✅ **Model Version Filtering**: Filter events by specific model version
-- ✅ **Confidence Comparison**: Calculate prediction confidence differences
-- ✅ **Health Monitoring**: Database and inference API connectivity checks
-
-### Endpoints
-
-- **Replay Events**: `POST /replay?model_version=v2&limit=50`
-- **Health Check**: `GET /health` at http://localhost:8002/health
-- **API Docs**: http://localhost:8002/docs
-
-### Quick Start
-
-**Start replay service**:
-```bash
-cd infra
-podman-compose up -d replay-service
-```
-
-**Check service health**:
-```bash
-curl http://localhost:8002/health
-```
-
-### API Usage Examples
-
-**Replay last 10 events**:
+**Replay last 10 events:**
 ```bash
 curl -X POST "http://localhost:8002/replay?limit=10"
 ```
 
-**Replay events for specific model version**:
+**Replay events for specific model version:**
 ```bash
 curl -X POST "http://localhost:8002/replay?model_version=v1.0.0&limit=20"
 ```
 
-**Example response**:
+**Example Response:**
 ```json
 {
   "replayed_count": 10,
@@ -385,76 +215,96 @@ curl -X POST "http://localhost:8002/replay?model_version=v1.0.0&limit=20"
   "comparisons": [
     {
       "request_id": "abc-123",
-      "old_prediction": {
-        "label": 0,
-        "confidence": 0.85
-      },
-      "new_prediction": {
-        "label": 0,
-        "confidence": 0.92
-      },
+      "old_prediction": {"label": 0, "confidence": 0.85},
+      "new_prediction": {"label": 0, "confidence": 0.92},
       "confidence_diff": 0.07
     }
   ]
 }
 ```
 
-### Testing Replay
+### Use Cases
 
-**Generate some events**:
-```bash
-cd data-generator
-python3 generator.py
-# Let run for 30 seconds, then Ctrl+C
-```
+- **Model Regression Testing** — Validate new model versions against historical data
+- **Debugging Production Issues** — Reproduce exact conditions that caused failures
+- **A/B Testing Analysis** — Compare prediction differences between model versions
+- **Confidence Calibration** — Analyze how confidence scores change over time
 
-**Verify events are stored**:
-```bash
-podman exec ml-obs-postgres psql -U mlobs -d ml_observability \
-  -c "SELECT COUNT(*) FROM ml_events;"
-```
+## Documentation
 
-**Replay the events**:
-```bash
-curl -X POST "http://localhost:8002/replay?limit=5"
-```
+### Core Documentation
+- [Architecture](docs/ARCHITECTURE.md) — System design and component interactions
+- [API Reference](docs/API.md) — Complete API documentation for all services
+- [Testing Guide](docs/TESTING.md) — Comprehensive testing and validation procedures
+- [Design Decisions](docs/DECISIONS.md) — Technical decisions and trade-offs
 
-### Database Schema
+### Implementation Phases
+- [Phase 1: Infrastructure](docs/PHASE_1.md) — Redis, PostgreSQL, Prometheus, Grafana setup
+- [Phase 2: Data Generator](docs/PHASE_2.md) — Synthetic event generation with drift
+- [Phase 4: Drift Detection](docs/PHASE_4.md) — Statistical drift detection implementation
+- [Phase 5: Monitoring & Alerting](docs/PHASE_5.md) — Alert rules and dashboards
 
-Events are stored in the `ml_events` table:
-- `request_id` (PRIMARY KEY) - Ensures uniqueness
-- `timestamp` - Event timestamp (indexed)
-- `model_version` - Model version (indexed)
-- `features` - JSONB feature data
-- `prediction` - JSONB prediction data
-- `metadata` - JSONB metadata
+### Service Documentation
+- [Data Generator](data-generator/README.md) — Event generation service
+- [Inference API](inference-api/README.md) — ML prediction service
+- [Drift Service](drift-service/README.md) — Drift detection service
+- [Replay Service](replay-service/README.md) — Event replay service
 
-### Configuration
+### Build Specification
+- [Build Spec](docs/BUILD_SPEC.md) — Complete phased build workflow
 
-Key environment variables (see [`replay-service/.env.example`](replay-service/.env.example)):
+## Screenshots
 
-- `POSTGRES_HOST=postgres` - PostgreSQL host
-- `POSTGRES_DB=ml_observability` - Database name
-- `INFERENCE_API_URL=http://inference-api:8001` - Inference API endpoint
-- `MAX_BATCH_SIZE=50` - Maximum events per replay request
+### Grafana Dashboard
+*[Placeholder: Screenshot of ML Drift Monitoring dashboard showing real-time drift scores, feature distributions, and detection events over time]*
 
-For comprehensive documentation, see [Replay Service README](replay-service/README.md).
+### Prometheus Alerts
+*[Placeholder: Screenshot of Prometheus alerts page showing configured alert rules (HighDriftScore, PredictionThroughputDrop, HighInferenceLatency) with their current states]*
+
+### Alert Firing
+*[Placeholder: Screenshot of Alertmanager showing active firing alert with details including severity, labels, and notification status]*
+
+## Technology Stack
+
+**Backend & APIs:**
+- Python 3.9+
+- FastAPI (async web framework)
+- scikit-learn (ML models)
+
+**Event Streaming:**
+- Redis Streams (event backbone)
+- Consumer Groups (reliable processing)
+
+**Data Storage:**
+- PostgreSQL (event persistence)
+- JSONB (flexible schema)
+
+**Monitoring & Alerting:**
+- Prometheus (metrics collection)
+- Grafana (visualization)
+- Alertmanager (alert routing)
+
+**Infrastructure:**
+- Podman (containerization)
+- podman-compose (orchestration)
 
 ## Project Structure
 
-```text
+```
 ml-observability-platform/
-├── data-generator/       # Synthetic event generator
-├── inference-api/        # ML inference service
+├── data-generator/       # Synthetic event generator with drift
+├── inference-api/        # ML inference service (FastAPI)
 ├── drift-service/        # Real-time drift detection
-├── observer-engine/      # (Future) Advanced observability
-├── replay-service/       # (Future) Event replay
+├── replay-service/       # Event replay for debugging
 ├── infra/                # Infrastructure configuration
 │   ├── podman-compose.yml
 │   ├── prometheus.yml
-│   └── grafana/
-├── schemas/              # Event schemas
-└── docs/                 # Documentation
+│   ├── alerts.yml
+│   ├── alertmanager.yml
+│   └── grafana/          # Dashboard provisioning
+├── schemas/              # Event schemas (JSON Schema)
+├── scripts/              # Demo and validation scripts
+└── docs/                 # Comprehensive documentation
 ```
 
 ## Services Overview
@@ -471,31 +321,6 @@ ml-observability-platform/
 | Drift Service | 8000 | Drift detection | ✅ Running |
 | Replay Service | 8002 | Event replay | ✅ Running |
 
-## Documentation Index
-
-### Phase Documentation
-- [`docs/PHASE_1.md`](docs/PHASE_1.md) — Infrastructure setup
-- [`docs/PHASE_2.md`](docs/PHASE_2.md) — Data generator implementation
-- [`docs/PHASE_4.md`](docs/PHASE_4.md) — Drift detection service
-- [`docs/PHASE_5.md`](docs/PHASE_5.md) — Monitoring and alerting system
-
-### Service Documentation
-- [`data-generator/README.md`](data-generator/README.md) — Data generator service
-- [`inference-api/README.md`](inference-api/README.md) — Inference API service
-- [`drift-service/README.md`](drift-service/README.md) — Drift detection service
-
-### Architecture & Specifications
-- [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md) — Full phased build workflow
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — System architecture
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — Key technical decisions
-
-## Stop the Platform
-
-```bash
-cd infra
-podman-compose down
-```
-
 ## License
 
-See [LICENSE](LICENSE).
+MIT License - See [LICENSE](LICENSE) for details.

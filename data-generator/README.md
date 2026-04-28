@@ -46,7 +46,7 @@ Environment variables:
 
 ### Prerequisites
 - Python 3.11+
-- Redis running (see `infra/docker-compose.yml`)
+- Redis running (see `infra/podman-compose.yml`)
 
 ### Install Dependencies
 ```bash

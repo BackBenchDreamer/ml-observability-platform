@@ -42,7 +42,7 @@ Phase 1 established the foundational infrastructure for the ML observability pla
 
 ### Configuration Files Created
 
-1. **`infra/docker-compose.yml`**
+1. **`infra/podman-compose.yml`**
    - Podman-compatible orchestration
    - All services with health checks
    - Persistent volumes for data retention
@@ -489,7 +489,7 @@ With infrastructure in place, Phase 2 will implement:
 ## Files Created/Modified
 
 ### Created
-- `infra/docker-compose.yml` - Service orchestration
+- `infra/podman-compose.yml` - Service orchestration
 - `infra/prometheus.yml` - Prometheus configuration
 - `infra/grafana/provisioning/datasources/prometheus.yml` - Grafana datasource
 - `schemas/event_schema.json` - Event contract

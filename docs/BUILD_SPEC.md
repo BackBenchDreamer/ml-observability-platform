@@ -246,11 +246,11 @@ Use:
 
 * `podman-compose` (preferred)
   OR
-* compatible docker-compose syntax but runnable via Podman
+* compatible podman-compose syntax
 
 Requirements:
 
-* Generate `docker-compose.yml` that works with Podman
+* Generate `podman-compose.yml` that works with Podman
 * Ensure:
 
   * No Docker-specific features that break Podman
@@ -269,7 +269,7 @@ podman-compose up
 
 Generate:
 
-1. docker-compose.yml (Podman compatible)
+1. podman-compose.yml (Podman compatible)
 2. prometheus.yml
 3. Grafana provisioning (basic)
 4. Volume persistence (Postgres, Prometheus)
@@ -284,7 +284,7 @@ ml-observability-platform/
 ├── observer-engine/
 ├── replay-service/
 ├── infra/
-│   ├── docker-compose.yml
+│   ├── podman-compose.yml
 │   ├── prometheus.yml
 │   └── grafana/
 └── README.md
@@ -333,7 +333,7 @@ Phase 1 → Infrastructure Setup
 
 Provide:
 
-1. docker-compose.yml (Podman-compatible)
+1. podman-compose.yml (Podman-compatible)
 2. prometheus.yml
 3. Instructions to run with podman-compose
 4. Commit message + git commands
