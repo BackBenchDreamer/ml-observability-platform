@@ -87,16 +87,31 @@ Established foundational infrastructure with Redis, PostgreSQL, Prometheus, and 
 - Service health monitoring
 - Grafana datasource provisioning
 
-### 🔄 Phase 2: Data Generator (PLANNED)
-**Documentation:** `docs/PHASE_2.md` (to be created)
+### ✅ Phase 2: Data Generator (COMPLETED)
+**[View detailed documentation →](data-generator/README.md)**
 
-Implement synthetic event generator with configurable drift injection.
+Synthetic event generator with drift simulation for testing observability pipelines.
 
-**Planned Features:**
-- Synthetic event generation
-- Drift toggle (mean shift, null injection, skew)
-- Redis Streams publishing
-- Schema validation
+**Key Features:**
+- Normal distribution-based feature generation
+- Configurable drift mode (mean shift: 0 → 5)
+- Redis Streams publishing (`ml-events` stream)
+- Schema-compliant event emission
+
+**Quick Start:**
+```bash
+cd data-generator
+python generator.py
+# Enable drift: ENABLE_DRIFT=true python generator.py
+```
+
+**Verify Events:**
+```bash
+podman exec ml-obs-redis redis-cli XLEN ml-events
+podman exec ml-obs-redis redis-cli XREAD COUNT 1 STREAMS ml-events 0
+```
+
+See [`data-generator/README.md`](data-generator/README.md) for detailed instructions.
 
 ### 🔄 Phase 3: Inference API (PLANNED)
 **Documentation:** `docs/PHASE_3.md` (to be created)
@@ -257,6 +272,6 @@ See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Current Status**: Phase 1 Complete ✅  
-**Next Phase**: Phase 2 - Data Generator  
+**Current Status**: Phase 2 Complete ✅
+**Next Phase**: Phase 3 - Inference API
 **Last Updated**: 2026-04-28
