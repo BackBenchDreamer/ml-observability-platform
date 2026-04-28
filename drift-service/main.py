@@ -195,6 +195,15 @@ class DriftService:
             features = event['features']
             prediction = event['prediction']
             
+            # Record prediction count (Phase 5 metric)
+            self.metrics_manager.record_prediction()
+            
+            # Record inference latency if available in metadata (Phase 5 metric)
+            metadata = event.get('metadata', {})
+            if 'latency_ms' in metadata:
+                latency_seconds = metadata['latency_ms'] / 1000.0
+                self.metrics_manager.record_inference_latency(latency_seconds)
+            
             # Check if baseline is complete
             if not self.drift_detector.is_baseline_ready():
                 # Collect baseline samples
@@ -223,6 +232,9 @@ class DriftService:
                 
                 # Detect drift if sliding window is ready
                 if self.drift_detector.is_sliding_window_ready():
+                    # Track max drift score for unified ml_drift_score metric
+                    max_drift_score = 0.0
+                    
                     # Check each feature for drift
                     for feature_name in ['feature_1', 'feature_2', 'feature_3']:
                         drift_result = self.drift_detector.detect_feature_drift(feature_name)
@@ -235,6 +247,9 @@ class DriftService:
                                 drift_result['ks_statistic'],
                                 drift_result['p_value']
                             )
+                            
+                            # Track max drift score (Phase 5 metric)
+                            max_drift_score = max(max_drift_score, drift_result['psi_score'])
                             
                             # Publish alert if drift detected
                             if drift_result['drift_detected']:
@@ -286,6 +301,10 @@ class DriftService:
                                 }
                             }
                             self.publish_alert(alert_data)
+                    
+                    # Update unified ml_drift_score (Phase 5 metric)
+                    # Use max of feature drift scores as the unified metric
+                    self.metrics_manager.update_ml_drift_score(max_drift_score)
             
             # Record processing time
             duration = time.time() - start_time

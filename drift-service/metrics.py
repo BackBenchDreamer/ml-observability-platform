@@ -74,6 +74,23 @@ processing_latency_seconds = Histogram(
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
 )
 
+# Phase 5 alerting metrics
+ml_drift_score = Gauge(
+    'ml_drift_score',
+    'Unified drift score (max of feature drift scores)'
+)
+
+total_predictions = Counter(
+    'total_predictions',
+    'Total number of predictions processed'
+)
+
+inference_latency = Histogram(
+    'inference_latency',
+    'Inference latency in seconds',
+    buckets=[0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0]
+)
+
 # Baseline and sliding window status
 baseline_samples_collected = Gauge(
     'drift_baseline_samples_collected',
@@ -177,6 +194,28 @@ class MetricsManager:
             duration_seconds: Processing duration in seconds
         """
         processing_latency_seconds.observe(duration_seconds)
+        
+    def update_ml_drift_score(self, score: float):
+        """
+        Update unified ML drift score
+        
+        Args:
+            score: Unified drift score (typically max of feature drift scores)
+        """
+        ml_drift_score.set(score)
+        
+    def record_prediction(self):
+        """Record that a prediction was processed"""
+        total_predictions.inc()
+        
+    def record_inference_latency(self, latency_seconds: float):
+        """
+        Record inference latency
+        
+        Args:
+            latency_seconds: Inference latency in seconds
+        """
+        inference_latency.observe(latency_seconds)
         
     @staticmethod
     def get_metrics() -> bytes:

@@ -1,0 +1,35 @@
+groups:
+  - name: ml_monitoring_alerts
+    interval: 30s
+    rules:
+      # Drift Detection Alert
+      - alert: HighDriftScore
+        expr: ml_drift_score > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ML model drift detected"
+          description: "Drift score is {{ $value }} (threshold: 0.2)"
+
+      # Throughput Drop Alert
+      - alert: PredictionThroughputDrop
+        expr: rate(total_predictions[1m]) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No predictions being processed"
+          description: "Prediction throughput has dropped to zero for 2 minutes"
+
+      # Latency Alert
+      - alert: HighInferenceLatency
+        expr: histogram_quantile(0.95, sum(rate(inference_latency_bucket[5m])) by (le)) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 inference latency above 1 second"
+          description: "P95 latency is {{ $value }}s (threshold: 1.0s)"
+
+# Made with Bob

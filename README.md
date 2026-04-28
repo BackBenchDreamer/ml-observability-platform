@@ -8,6 +8,7 @@ A phased, event-driven ML observability platform for generating inference events
 - ✅ Phase 2 complete — Data generator service
 - ✅ Phase 3 complete — Inference API
 - ✅ Phase 4 complete — Drift detection service
+- ✅ Phase 5 complete — Monitoring and alerting system
 
 Detailed implementation notes are documented per phase:
 
@@ -15,6 +16,7 @@ Detailed implementation notes are documented per phase:
 - [Phase 2 Documentation](docs/PHASE_2.md)
 - [Phase 3 Documentation](inference-api/README.md)
 - [Phase 4 Documentation](docs/PHASE_4.md)
+- [Phase 5 Documentation](docs/PHASE_5.md)
 - [Build Specification](docs/BUILD_SPEC.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Technical Decisions](docs/DECISIONS.md)
@@ -237,6 +239,75 @@ For comprehensive documentation, see:
 - [Drift Service README](drift-service/README.md) - Service-level documentation
 - [Phase 4 Documentation](docs/PHASE_4.md) - Complete phase implementation details
 
+## Phase 5: Monitoring and Alerting System ✅
+
+Converts passive monitoring into an active alerting system with automated notifications.
+
+### Alert Pipeline Flow
+
+1. **Prometheus** scrapes metrics from drift-service every 15 seconds
+2. **Alert rules** evaluate conditions (drift, latency, throughput)
+3. **Alertmanager** receives and groups alerts
+4. **Webhook receiver** logs alert notifications
+
+### Key Components
+
+- **Prometheus Alert Rules** (`infra/alerts.yml`):
+  - `HighDriftScore`: Triggers when `ml_drift_score > 0.2` for 2 minutes
+  - `PredictionThroughputDrop`: Triggers when prediction rate drops to 0 for 2 minutes
+  - `HighInferenceLatency`: Triggers when P95 latency exceeds 1 second for 2 minutes
+
+- **Alertmanager** (`infra/alertmanager.yml`):
+  - Routes alerts to webhook receiver
+  - Groups alerts by severity and service
+  - Configurable notification channels
+
+- **Webhook Receiver** (`infra/webhook_receiver.py`):
+  - Receives alert notifications from Alertmanager
+  - Logs alert details for debugging
+  - Extensible for Slack, email, or PagerDuty integration
+
+- **Grafana Dashboards** (3 dashboards):
+  - **ML Drift Monitoring**: Real-time drift scores and detection events
+  - **Prediction Distribution**: Prediction label distribution and trends
+  - **System Health**: Service health, latency, and throughput metrics
+
+### How to Test Alerts
+
+**Start the system**:
+```bash
+cd infra
+podman-compose up -d
+```
+
+**Trigger HighDriftScore alert**:
+```bash
+cd data-generator
+ENABLE_DRIFT=true python generator.py
+# Let run for 2+ minutes to trigger alert
+```
+
+**Trigger PredictionThroughputDrop alert**:
+```bash
+# Stop the data-generator
+# Wait 2+ minutes for alert to fire
+```
+
+**Check alerts**:
+- Prometheus alerts: http://localhost:9090/alerts
+- Alertmanager: http://localhost:9093
+- Webhook logs: `podman logs -f webhook-receiver`
+
+### Grafana Dashboards
+
+Access pre-configured dashboards at http://localhost:3000 (admin/admin):
+
+- **ML Drift Monitoring**: http://localhost:3000/d/ml-drift-monitor
+- **Prediction Distribution**: http://localhost:3000/d/prediction-dist
+- **System Health**: http://localhost:3000/d/system-health
+
+For detailed documentation, see [Phase 5 Documentation](docs/PHASE_5.md).
+
 ## Project Structure
 
 ```text
@@ -262,6 +333,8 @@ ml-observability-platform/
 | PostgreSQL | 5432 | Event persistence | ✅ Running |
 | Prometheus | 9090 | Metrics collection | ✅ Running |
 | Grafana | 3000 | Visualization | ✅ Running |
+| Alertmanager | 9093 | Alert routing | ✅ Running |
+| Webhook Receiver | 5001 | Alert notifications | ✅ Running |
 | Inference API | 8001 | ML predictions | ✅ Running |
 | Drift Service | 8000 | Drift detection | ✅ Running |
 
@@ -271,6 +344,7 @@ ml-observability-platform/
 - [`docs/PHASE_1.md`](docs/PHASE_1.md) — Infrastructure setup
 - [`docs/PHASE_2.md`](docs/PHASE_2.md) — Data generator implementation
 - [`docs/PHASE_4.md`](docs/PHASE_4.md) — Drift detection service
+- [`docs/PHASE_5.md`](docs/PHASE_5.md) — Monitoring and alerting system
 
 ### Service Documentation
 - [`data-generator/README.md`](data-generator/README.md) — Data generator service

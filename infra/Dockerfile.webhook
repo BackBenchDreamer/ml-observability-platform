@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY webhook_requirements.txt .
+RUN pip install --no-cache-dir -r webhook_requirements.txt
+
+# Copy the webhook receiver application
+COPY webhook_receiver.py .
+
+# Expose port 5000
+EXPOSE 5000
+
+# Run the webhook receiver
+CMD ["python", "webhook_receiver.py"]
