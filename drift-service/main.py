@@ -18,6 +18,7 @@ import uvicorn
 from consumer import RedisStreamConsumer
 from drift import DriftDetector
 from metrics import get_metrics_manager, MetricsManager
+from db import EventDatabase
 
 # Configure logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
@@ -77,6 +78,7 @@ class DriftService:
         self.consumer: Optional[RedisStreamConsumer] = None
         self.drift_detector: Optional[DriftDetector] = None
         self.metrics_manager: MetricsManager = get_metrics_manager()
+        self.event_db: Optional[EventDatabase] = None
         
         logger.info(f"Drift service initialized with config:")
         logger.info(f"  Redis: {self.redis_host}:{self.redis_port}")
@@ -145,6 +147,25 @@ class DriftService:
             logger.error(f"Failed to initialize consumer: {e}")
             return False
             
+    def initialize_database(self) -> bool:
+        """
+        Initialize PostgreSQL database connection
+        
+        Returns:
+            bool: True if initialized successfully
+        """
+        try:
+            self.event_db = EventDatabase()
+            if self.event_db.connect():
+                logger.info("Database initialized successfully")
+                return True
+            else:
+                logger.warning("Failed to connect to database, event persistence disabled")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            return False
+    
     def initialize_drift_detector(self):
         """Initialize drift detector"""
         self.drift_detector = DriftDetector(
@@ -192,6 +213,10 @@ class DriftService:
         start_time = time.time()
         
         try:
+            # Persist event to database
+            if self.event_db:
+                self.event_db.store_event(event)
+            
             features = event['features']
             prediction = event['prediction']
             
@@ -328,6 +353,9 @@ class DriftService:
             logger.error("Failed to initialize consumer, exiting")
             sys.exit(1)
             
+        # Initialize database (non-blocking, continues even if fails)
+        self.initialize_database()
+        
         # Initialize drift detector
         self.initialize_drift_detector()
         

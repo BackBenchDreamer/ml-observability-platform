@@ -9,6 +9,7 @@ A phased, event-driven ML observability platform for generating inference events
 - ✅ Phase 3 complete — Inference API
 - ✅ Phase 4 complete — Drift detection service
 - ✅ Phase 5 complete — Monitoring and alerting system
+- ✅ Phase 6 complete — Replay system
 
 Detailed implementation notes are documented per phase:
 
@@ -60,6 +61,7 @@ Wait until all services report `healthy` status (may take 30-60 seconds).
 - **Prometheus**: http://localhost:9090
 - **Inference API**: http://localhost:8001
 - **Drift Service**: http://localhost:8000
+- **Replay Service**: http://localhost:8002
 - **Redis**: `localhost:6379`
 - **PostgreSQL**: `localhost:5432`
 
@@ -308,6 +310,136 @@ Access pre-configured dashboards at http://localhost:3000 (admin/admin):
 
 For detailed documentation, see [Phase 5 Documentation](docs/PHASE_5.md).
 
+## Phase 6: Replay System ✅
+
+Event replay system for debugging ML failures and comparing model versions.
+
+### Why Replay Matters
+
+When ML models fail in production, you need to:
+- **Reproduce the exact failure** with historical data
+- **Compare predictions** between model versions
+- **Debug confidence changes** to understand model behavior
+- **Validate fixes** before redeployment
+
+The replay system stores every inference event in PostgreSQL and allows you to replay them through the current model to see how predictions have changed.
+
+### System Flow
+
+```
+1. Inference API → PostgreSQL (event persistence)
+   ↓
+2. Replay Service fetches events from PostgreSQL
+   ↓
+3. Replay Service sends features to Inference API
+   ↓
+4. Compare old vs new predictions
+   ↓
+5. Return confidence differences
+```
+
+### Features
+
+- ✅ **PostgreSQL Event Persistence**: All events stored with `request_id` uniqueness
+- ✅ **Batch Replay**: Replay up to 50 events at once
+- ✅ **Model Version Filtering**: Filter events by specific model version
+- ✅ **Confidence Comparison**: Calculate prediction confidence differences
+- ✅ **Health Monitoring**: Database and inference API connectivity checks
+
+### Endpoints
+
+- **Replay Events**: `POST /replay?model_version=v2&limit=50`
+- **Health Check**: `GET /health` at http://localhost:8002/health
+- **API Docs**: http://localhost:8002/docs
+
+### Quick Start
+
+**Start replay service**:
+```bash
+cd infra
+podman-compose up -d replay-service
+```
+
+**Check service health**:
+```bash
+curl http://localhost:8002/health
+```
+
+### API Usage Examples
+
+**Replay last 10 events**:
+```bash
+curl -X POST "http://localhost:8002/replay?limit=10"
+```
+
+**Replay events for specific model version**:
+```bash
+curl -X POST "http://localhost:8002/replay?model_version=v1.0.0&limit=20"
+```
+
+**Example response**:
+```json
+{
+  "replayed_count": 10,
+  "model_version": "v1.0.0",
+  "comparisons": [
+    {
+      "request_id": "abc-123",
+      "old_prediction": {
+        "label": 0,
+        "confidence": 0.85
+      },
+      "new_prediction": {
+        "label": 0,
+        "confidence": 0.92
+      },
+      "confidence_diff": 0.07
+    }
+  ]
+}
+```
+
+### Testing Replay
+
+**Generate some events**:
+```bash
+cd data-generator
+python3 generator.py
+# Let run for 30 seconds, then Ctrl+C
+```
+
+**Verify events are stored**:
+```bash
+podman exec ml-obs-postgres psql -U mlobs -d ml_observability \
+  -c "SELECT COUNT(*) FROM ml_events;"
+```
+
+**Replay the events**:
+```bash
+curl -X POST "http://localhost:8002/replay?limit=5"
+```
+
+### Database Schema
+
+Events are stored in the `ml_events` table:
+- `request_id` (PRIMARY KEY) - Ensures uniqueness
+- `timestamp` - Event timestamp (indexed)
+- `model_version` - Model version (indexed)
+- `features` - JSONB feature data
+- `prediction` - JSONB prediction data
+- `metadata` - JSONB metadata
+
+### Configuration
+
+Key environment variables (see [`replay-service/.env.example`](replay-service/.env.example)):
+
+- `POSTGRES_HOST=postgres` - PostgreSQL host
+- `POSTGRES_DB=ml_observability` - Database name
+- `INFERENCE_API_URL=http://inference-api:8001` - Inference API endpoint
+- `MAX_BATCH_SIZE=50` - Maximum events per replay request
+
+For comprehensive documentation, see [Replay Service README](replay-service/README.md).
+
 ## Project Structure
 
 ```text
@@ -337,6 +469,7 @@ ml-observability-platform/
 | Webhook Receiver | 5001 | Alert notifications | ✅ Running |
 | Inference API | 8001 | ML predictions | ✅ Running |
 | Drift Service | 8000 | Drift detection | ✅ Running |
+| Replay Service | 8002 | Event replay | ✅ Running |
 
 ## Documentation Index
 

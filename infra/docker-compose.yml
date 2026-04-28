@@ -147,6 +147,77 @@ services:
     networks:
       - ml-obs-network
 
+  drift-service:
+    build:
+      context: ../drift-service
+      dockerfile: Dockerfile
+    container_name: ml-obs-drift-service
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ml_observability
+      POSTGRES_USER: mlobs
+      POSTGRES_PASSWORD: mlobs_pass
+      STREAM_NAME: ml-events
+      ALERT_STREAM_NAME: ml-alerts
+      CONSUMER_GROUP: drift-detector
+      CONSUMER_NAME: drift-worker-1
+      BASELINE_WINDOW_SIZE: 100
+      SLIDING_WINDOW_SIZE: 100
+      DRIFT_THRESHOLD_PSI: 0.2
+      DRIFT_THRESHOLD_KS: 0.05
+      CHECK_INTERVAL_MS: 1000
+      METRICS_PORT: 8000
+      LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ml-obs-network
+
+  replay-service:
+    build:
+      context: ../replay-service
+      dockerfile: Dockerfile
+    container_name: ml-obs-replay-service
+    ports:
+      - "8002:8002"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ml_observability
+      POSTGRES_USER: mlobs
+      POSTGRES_PASSWORD: mlobs_pass
+      INFERENCE_API_URL: http://inference-api:8001
+      LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      inference-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ml-obs-network
+
 volumes:
   redis-data:
     driver: local
