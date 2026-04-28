@@ -126,7 +126,7 @@ Example run:
 
 ```bash
 cd data-generator
-python generator.py
+python3 generator.py
 ```
 
 ### Drift Mode Validation
@@ -135,7 +135,7 @@ Drift mode was verified by running the generator with drift enabled:
 
 ```bash
 cd data-generator
-ENABLE_DRIFT=true python generator.py
+ENABLE_DRIFT=true python3 generator.py
 ```
 
 Validation goals:
@@ -148,8 +148,8 @@ Validation goals:
 Redis stream integration was verified using stream inspection commands:
 
 ```bash
-podman exec ml-obs-redis redis-cli XLEN ml-events
-podman exec ml-obs-redis redis-cli XREAD COUNT 1 STREAMS ml-events 0
+podman exec -it ml-obs-redis redis-cli XLEN ml-events
+podman exec -it ml-obs-redis redis-cli XREAD COUNT 5 STREAMS ml-events 0
 ```
 
 Expected outcomes:
@@ -198,14 +198,14 @@ This ensures downstream services can rely on a consistent contract.
 
 4. Run the generator:
    ```bash
-   python generator.py
+   python3 generator.py
    ```
 
 ### Run with Drift Enabled
 
 ```bash
 cd data-generator
-ENABLE_DRIFT=true python generator.py
+ENABLE_DRIFT=true python3 generator.py
 ```
 
 ### Container Execution
