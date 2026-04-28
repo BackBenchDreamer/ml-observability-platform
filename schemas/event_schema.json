@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "request_id": "uuid-v4",
+  "timestamp": "ISO-8601",
+  "model_version": "v1.0.0",
+  "features": {
+    "feature_1": 0.85,
+    "feature_2": 1.2,
+    "is_premium_user": true
+  },
+  "prediction": {
+    "label": 0,
+    "confidence": 0.92
+  },
+  "metadata": {
+    "latency_ms": 45.2,
+    "environment": "production",
+    "region": "local"
+  }
+}
