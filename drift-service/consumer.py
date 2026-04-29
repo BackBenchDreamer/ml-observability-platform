@@ -147,25 +147,27 @@ class RedisStreamConsumer:
     def _parse_data_generator_format(self, event: Dict, message_id: bytes) -> Dict[str, Any]:
         """
         Parse data-generator format event
-        
+
         Args:
             event: Parsed event JSON
             message_id: Redis message ID
-            
+
         Returns:
             dict: Standardized event format
         """
+        features = event.get('features', {})
         features = {
-            'feature_1': float(event.get('feature_1', 0.0)),
-            'feature_2': float(event.get('feature_2', 0.0)),
-            'feature_3': float(event.get('feature_3', 0.0))
+            'feature_1': float(features.get('feature_1', 0.0)),
+            'feature_2': float(features.get('feature_2', 0.0)),
+            'feature_3': float(features.get('feature_3', 0.0))
         }
-        
+
+        prediction = event.get('prediction', {})
         prediction = {
-            'label': int(event.get('label', 0)),
-            'confidence': float(event.get('confidence', 0.0))
+            'label': int(prediction.get('label', 0)),
+            'confidence': float(prediction.get('confidence', 0.0))
         }
-        
+
         return {
             'message_id': message_id.decode('utf-8'),
             'request_id': event.get('request_id', message_id.decode('utf-8')),

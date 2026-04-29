@@ -218,6 +218,25 @@ services:
     networks:
       - ml-obs-network
 
+  data-generator:
+    build:
+      context: ../data-generator
+      dockerfile: Dockerfile
+    container_name: ml-obs-data-generator
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STREAM_NAME: ml-events
+      EVENT_INTERVAL: 0.5
+      ENABLE_DRIFT: "false"
+      LOG_LEVEL: INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ml-obs-network
+
 volumes:
   redis-data:
     driver: local

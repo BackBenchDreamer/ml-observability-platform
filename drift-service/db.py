@@ -97,7 +97,7 @@ class EventDatabase:
     def _create_table(self, conn):
         """
         Create ml_events table if it doesn't exist
-        
+
         Args:
             conn: Database connection
         """
@@ -106,7 +106,7 @@ class EventDatabase:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS ml_events (
                     request_id TEXT PRIMARY KEY,
-                    timestamp TIMESTAMP,
+                    timestamp TIMESTAMP WITH TIME ZONE,
                     model_version TEXT,
                     features JSONB,
                     prediction JSONB,
@@ -115,12 +115,12 @@ class EventDatabase:
             """)
             # Create index on timestamp for efficient queries
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ml_events_timestamp 
+                CREATE INDEX IF NOT EXISTS idx_ml_events_timestamp
                 ON ml_events(timestamp DESC)
             """)
             # Create index on model_version for filtering
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ml_events_model_version 
+                CREATE INDEX IF NOT EXISTS idx_ml_events_model_version
                 ON ml_events(model_version)
             """)
             logger.info("Database schema initialized")

@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY consumer.py .
 COPY drift.py .
 COPY metrics.py .
+COPY db.py .
 COPY main.py .
 
 # Expose metrics port

@@ -24,4 +24,4 @@ ENV REDIS_HOST=redis \
 RUN chmod +x generator.py
 
 # Run the generator
-CMD ["python", "-u", "generator.py"]
+CMD ["python3", "-u", "generator.py"]

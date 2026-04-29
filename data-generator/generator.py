@@ -52,10 +52,10 @@ def signal_handler(signum, frame):
 def generate_features(drift_mode: bool) -> Dict[str, Any]:
     """
     Generate synthetic feature data using normal distribution.
-    
+
     Args:
         drift_mode: If True, apply drift by shifting mean significantly
-        
+
     Returns:
         Dictionary containing feature values
     """
@@ -63,15 +63,17 @@ def generate_features(drift_mode: bool) -> Dict[str, Any]:
         # Drift mode: shift mean to simulate data drift
         feature_1 = float(np.random.normal(DRIFT_MEAN, DRIFT_STD))
         feature_2 = float(np.random.normal(DRIFT_MEAN, DRIFT_STD))
+        feature_3 = float(np.random.normal(DRIFT_MEAN, DRIFT_STD))
     else:
         # Normal mode: standard normal distribution
         feature_1 = float(np.random.normal(NORMAL_MEAN, NORMAL_STD))
         feature_2 = float(np.random.normal(NORMAL_MEAN, NORMAL_STD))
-    
+        feature_3 = float(np.random.normal(NORMAL_MEAN, NORMAL_STD))
+
     return {
         "feature_1": round(feature_1, 4),
         "feature_2": round(feature_2, 4),
-        "is_premium_user": bool(np.random.choice([True, False]))
+        "feature_3": round(feature_3, 4)
     }
 
 

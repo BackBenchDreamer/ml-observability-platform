@@ -10,10 +10,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 import redis
 import uvicorn
+from prometheus_client import Counter, Histogram, generate_latest, REGISTRY
 
 from model import get_model
 
@@ -38,6 +39,23 @@ REDIS_STREAM = "ml-events"
 
 # Initialize Redis client
 redis_client = None
+
+# Prometheus metrics
+predictions_total = Counter(
+    'inference_predictions_total',
+    'Total number of predictions made'
+)
+
+prediction_latency = Histogram(
+    'inference_prediction_latency_seconds',
+    'Prediction latency in seconds',
+    buckets=[0.001, 0.01, 0.1, 0.5, 1.0]
+)
+
+redis_publish_errors = Counter(
+    'inference_redis_publish_errors_total',
+    'Total number of Redis publish errors'
+)
 
 
 def get_redis_client():
@@ -141,13 +159,22 @@ async def startup_event():
 async def health_check():
     """Health check endpoint"""
     redis_status = "connected" if get_redis_client() is not None else "disconnected"
-    
+
     return {
         "status": "healthy",
         "service": "inference-api",
         "redis": redis_status,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(
+        content=generate_latest(REGISTRY),
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
 
 
 @app.post("/predict", response_model=PredictionResponse)

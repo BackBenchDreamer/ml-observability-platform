@@ -21,7 +21,7 @@ EXPOSE 8002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8002/health', timeout=5.0)" || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:8002/health || exit 1
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["python3", "main.py"]

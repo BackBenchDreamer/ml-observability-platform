@@ -1,4 +1,8 @@
 #!/bin/bash
+# ML Observability Platform - Demo Script
+# Updated for Docker on Windows + Linux/WSL2
+# Original: Podman on Mac | Modified: Docker on Windows
+
 set -e
 
 # Color codes for output
@@ -25,27 +29,68 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Detect OS
+detect_os() {
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        echo "windows"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "mac"
+    else
+        echo "linux"
+    fi
+}
+
+OS=$(detect_os)
+print_info "Detected OS: $OS"
+
 # Validate prerequisites
 print_step "Validating prerequisites..."
-command_exists podman-compose || error_exit "podman-compose not found. Please install it first."
+
+# Check for Docker (not podman-compose)
+command_exists docker || error_exit "Docker not found. Please install Docker Desktop."
 command_exists python3 || error_exit "python3 not found. Please install it first."
 command_exists curl || error_exit "curl not found. Please install it first."
+
 print_success "All prerequisites satisfied"
 
 # 1. Start system
-print_step "Starting ML Observability Platform..."
+print_step "Starting ML Observability Platform with Docker..."
 cd infra
-podman-compose down 2>/dev/null || true
-podman-compose up -d
+
+print_info "Stopping any existing containers..."
+docker compose down 2>/dev/null || true
+
+print_info "Building images..."
+docker compose build --quiet 2>/dev/null || true
+
+print_info "Starting services (docker compose up -d)..."
+docker compose up -d
+
 cd ..
 print_success "Services started"
 
 # 2. Wait for services to initialize
-print_step "Waiting for services to initialize (30 seconds)..."
-sleep 30
+print_step "Waiting for services to initialize (45 seconds)..."
+sleep 45
 
 # 3. Check service health
 print_step "Checking service health..."
+
+# Check Redis
+print_info "Checking Redis..."
+if docker exec ml-obs-redis redis-cli ping > /dev/null 2>&1; then
+    print_success "Redis is healthy"
+else
+    error_exit "Redis is not responding"
+fi
+
+# Check PostgreSQL
+print_info "Checking PostgreSQL..."
+if docker exec ml-obs-postgres pg_isready -U mlobs -d ml_observability > /dev/null 2>&1; then
+    print_success "PostgreSQL is healthy"
+else
+    error_exit "PostgreSQL is not responding"
+fi
 
 # Check Prometheus
 print_info "Checking Prometheus..."
@@ -63,10 +108,10 @@ else
     error_exit "Grafana is not responding"
 fi
 
-# Check Inference API
+# Check Inference API (port 8001)
 print_info "Checking Inference API..."
 for i in {1..10}; do
-    if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+    if curl -s http://localhost:8001/health > /dev/null 2>&1; then
         print_success "Inference API is healthy"
         break
     fi
@@ -76,10 +121,10 @@ for i in {1..10}; do
     sleep 3
 done
 
-# Check Drift Service
+# Check Drift Service (port 8000)
 print_info "Checking Drift Service..."
 for i in {1..10}; do
-    if curl -s http://localhost:8001/health > /dev/null 2>&1; then
+    if curl -s http://localhost:8000/health > /dev/null 2>&1; then
         print_success "Drift Service is healthy"
         break
     fi
@@ -89,7 +134,7 @@ for i in {1..10}; do
     sleep 3
 done
 
-# Check Replay Service
+# Check Replay Service (port 8002)
 print_info "Checking Replay Service..."
 for i in {1..10}; do
     if curl -s http://localhost:8002/health > /dev/null 2>&1; then
@@ -102,158 +147,166 @@ for i in {1..10}; do
     sleep 3
 done
 
+# Check Webhook Receiver (port 5000)
+print_info "Checking Webhook Receiver..."
+if curl -s http://localhost:5000/health > /dev/null 2>&1; then
+    print_success "Webhook Receiver is healthy"
+else
+    error_exit "Webhook Receiver is not responding"
+fi
+
 print_success "All services are healthy"
 
-# 4. Start data generator in normal mode
-print_step "Starting data generator in normal mode..."
-print_info "Generating baseline traffic for 60 seconds..."
+# 4. Monitor data generation in normal mode
+print_step "Monitoring data pipeline in normal mode..."
+print_info "The data-generator service is running continuously in Docker"
+print_info "Collecting baseline metrics for 60 seconds..."
 
-# Create a temporary Python script to run the generator
-cat > /tmp/run_generator.py << 'EOF'
-import sys
-import os
-sys.path.insert(0, os.path.join(os.getcwd(), 'data-generator'))
-from generator import DataGenerator
-import time
+# Monitor metrics every 10 seconds
+for i in {1..6}; do
+    REDIS_COUNT=$(docker exec ml-obs-redis redis-cli XLEN ml-events 2>/dev/null || echo "0")
+    PG_COUNT=$(docker exec ml-obs-postgres psql -U mlobs -d ml_observability -tc "SELECT COUNT(*) FROM ml_events;" 2>/dev/null | tr -d ' ' || echo "0")
 
-generator = DataGenerator(
-    inference_url="http://localhost:8000/predict",
-    rate_per_second=5,
-    enable_drift=False
-)
+    echo -e "\n${YELLOW}[BASELINE - ${i}0s]${NC}"
+    echo "  Redis stream events: $REDIS_COUNT"
+    echo "  PostgreSQL stored:   $PG_COUNT"
 
-print("Starting data generator in normal mode...")
-generator.start()
-
-# Run for 60 seconds
-time.sleep(60)
-
-generator.stop()
-print("Data generator stopped")
-EOF
-
-python3 /tmp/run_generator.py &
-GENERATOR_PID=$!
-
-# 5. Wait for baseline metrics to stabilize
-print_step "Collecting baseline metrics (60 seconds)..."
-sleep 60
-
-# Kill the generator
-kill $GENERATOR_PID 2>/dev/null || true
-wait $GENERATOR_PID 2>/dev/null || true
+    if [ $i -lt 6 ]; then
+        sleep 10
+    fi
+done
 
 print_success "Baseline metrics collected"
 
-# Check current metrics
-print_info "Current drift metrics:"
-curl -s http://localhost:8001/metrics | grep "drift_detected" || true
+# 5. Check current inference metrics
+print_step "Checking current inference metrics..."
+print_info "Testing inference API prediction..."
+
+PRED_RESPONSE=$(curl -s -X POST http://localhost:8001/predict \
+  -H "Content-Type: application/json" \
+  -d '{"feature_1": 0.5, "feature_2": 1.2, "feature_3": 0.8}')
+
+echo -e "\n${BLUE}Prediction Response:${NC}"
+echo "$PRED_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$PRED_RESPONSE"
 
 # 6. Enable drift mode
-print_step "Enabling drift mode in data generator..."
-print_info "This will introduce distribution shift in the data..."
+print_step "Enabling drift mode..."
+print_info "Setting ENABLE_DRIFT=true in data-generator..."
 
-# Create a temporary Python script to run the generator with drift
-cat > /tmp/run_generator_drift.py << 'EOF'
-import sys
-import os
-sys.path.insert(0, os.path.join(os.getcwd(), 'data-generator'))
-from generator import DataGenerator
-import time
+# Create temporary docker-compose override file with drift enabled
+DRIFT_COMPOSE="infra/docker-compose.drift.yml"
+cat > "$DRIFT_COMPOSE" << 'DRIFT_EOF'
+version: '3.8'
+services:
+  data-generator:
+    environment:
+      ENABLE_DRIFT: "true"
+DRIFT_EOF
 
-generator = DataGenerator(
-    inference_url="http://localhost:8000/predict",
-    rate_per_second=5,
-    enable_drift=True
-)
+print_info "Restarting data-generator with drift enabled..."
+docker compose -f infra/docker-compose.yml -f "$DRIFT_COMPOSE" up -d data-generator
 
-print("Starting data generator with DRIFT enabled...")
-generator.start()
+print_success "Drift mode enabled"
 
-# Run for 90 seconds to allow drift detection
-time.sleep(90)
+# 7. Monitor drift detection
+print_step "Monitoring drift detection (90 seconds)..."
+print_info "Watching metrics for drift signals..."
 
-generator.stop()
-print("Data generator stopped")
-EOF
-
-python3 /tmp/run_generator_drift.py &
-DRIFT_GENERATOR_PID=$!
-
-# 7. Wait for drift detection and alert
-print_step "Waiting for drift detection and alert (90 seconds)..."
-print_info "Monitoring drift metrics..."
-
-# Monitor drift metrics every 10 seconds
 for i in {1..9}; do
-    sleep 10
-    echo -e "\n${YELLOW}[METRICS - ${i}0s]${NC}"
-    curl -s http://localhost:8001/metrics | grep -E "(drift_detected|drift_score|prediction_distribution)" | head -10 || true
-done
+    REDIS_COUNT=$(docker exec ml-obs-redis redis-cli XLEN ml-events 2>/dev/null || echo "0")
+    PG_COUNT=$(docker exec ml-obs-postgres psql -U mlobs -d ml_observability -tc "SELECT COUNT(*) FROM ml_events;" 2>/dev/null | tr -d ' ' || echo "0")
+    DRIFT_METRICS=$(curl -s http://localhost:8000/metrics | grep -E "drift_detected_total|ml_drift_score" | head -5 || echo "No drift detected yet")
 
-# Kill the drift generator
-kill $DRIFT_GENERATOR_PID 2>/dev/null || true
-wait $DRIFT_GENERATOR_PID 2>/dev/null || true
+    echo -e "\n${YELLOW}[DRIFT DETECTION - ${i}0s]${NC}"
+    echo "  Redis stream events: $REDIS_COUNT"
+    echo "  PostgreSQL stored:   $PG_COUNT"
+    echo "  Drift metrics:"
+    echo "$DRIFT_METRICS" | sed 's/^/    /'
+
+    if [ $i -lt 9 ]; then
+        sleep 10
+    fi
+done
 
 print_success "Drift detection period complete"
 
-# Check if drift was detected
-print_info "Final drift status:"
-DRIFT_STATUS=$(curl -s http://localhost:8001/metrics | grep "drift_detected" || echo "drift_detected 0")
-echo "$DRIFT_STATUS"
+# 8. Disable drift mode and restore normal operation
+print_step "Restoring normal mode..."
+print_info "Removing drift override configuration..."
 
-# 8. Call replay API to compare predictions
+rm -f "$DRIFT_COMPOSE"
+docker compose -f infra/docker-compose.yml up -d data-generator
+
+print_success "Normal mode restored"
+
+# 9. Call replay API
 print_step "Calling replay service to compare predictions..."
-print_info "Replaying last 100 predictions..."
+print_info "Replaying last 10 predictions..."
 
-REPLAY_RESPONSE=$(curl -s -X POST http://localhost:8002/replay \
-    -H "Content-Type: application/json" \
-    -d '{
-        "limit": 100,
-        "comparison_mode": "statistical"
-    }')
+REPLAY_RESPONSE=$(curl -s -X POST "http://localhost:8002/replay?limit=10")
 
 echo -e "\n${BLUE}Replay Results:${NC}"
 echo "$REPLAY_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$REPLAY_RESPONSE"
 
-# 9. Print summary and access information
+# 10. Check alerts in webhook
+print_step "Checking alerts received..."
+print_info "Viewing webhook-receiver logs..."
+
+WEBHOOK_LOGS=$(docker logs ml-obs-webhook-receiver 2>&1 | grep -i "alert\|drift" | tail -5 || echo "No alerts logged yet")
+
+if [ ! -z "$WEBHOOK_LOGS" ]; then
+    echo -e "\n${BLUE}Recent Alerts:${NC}"
+    echo "$WEBHOOK_LOGS"
+else
+    echo "No alerts received yet (alerts require drift threshold to be exceeded)"
+fi
+
+# 11. Print summary
 print_step "Demo complete! 🎉"
 
-echo -e "\n${GREEN}═══════════════════════════════════════════════════════════${NC}"
+echo -e "\n${GREEN}═════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}                    DEMO SUMMARY                           ${NC}"
-echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}═════════════════════════════════════════════════════════════${NC}"
 
 echo -e "\n${BLUE}Services Running:${NC}"
-echo "  • Prometheus:      http://localhost:9090"
-echo "  • Grafana:         http://localhost:3000 (admin/admin)"
-echo "  • Inference API:   http://localhost:8000"
-echo "  • Drift Service:   http://localhost:8001"
-echo "  • Replay Service:  http://localhost:8002"
-echo "  • Alertmanager:    http://localhost:9093"
+echo "  • Prometheus:         http://localhost:9090"
+echo "  • Grafana:            http://localhost:3000 (admin/admin)"
+echo "  • Inference API:      http://localhost:8001"
+echo "  • Drift Service:      http://localhost:8000"
+echo "  • Replay Service:     http://localhost:8002"
+echo "  • Webhook Receiver:   http://localhost:5000"
+echo "  • Alertmanager:       http://localhost:9093"
 
 echo -e "\n${BLUE}What Happened:${NC}"
-echo "  1. ✓ Started all services with podman-compose"
+echo "  1. ✓ Started all services with docker compose"
 echo "  2. ✓ Verified service health"
-echo "  3. ✓ Generated baseline traffic (60 seconds)"
-echo "  4. ✓ Enabled drift mode and generated shifted data (90 seconds)"
-echo "  5. ✓ Drift detection system analyzed the distribution shift"
+echo "  3. ✓ Monitored baseline traffic from data-generator"
+echo "  4. ✓ Enabled drift mode in data-generator"
+echo "  5. ✓ Drift detection system analyzed distribution shift"
 echo "  6. ✓ Replay service compared predictions"
+echo "  7. ✓ Webhook receiver monitored for alerts"
+
+FINAL_REDIS=$(docker exec ml-obs-redis redis-cli XLEN ml-events 2>/dev/null || echo "0")
+FINAL_PG=$(docker exec ml-obs-postgres psql -U mlobs -d ml_observability -tc "SELECT COUNT(*) FROM ml_events;" 2>/dev/null | tr -d ' ' || echo "0")
+
+echo -e "\n${BLUE}Final Metrics:${NC}"
+echo "  • Total events generated: $FINAL_REDIS"
+echo "  • Events persisted:       $FINAL_PG"
 
 echo -e "\n${BLUE}Next Steps:${NC}"
 echo "  • View dashboards in Grafana: http://localhost:3000"
 echo "  • Check Prometheus metrics: http://localhost:9090"
 echo "  • Review alerts in Alertmanager: http://localhost:9093"
-echo "  • Query drift metrics: curl http://localhost:8001/metrics"
-echo "  • Test replay API: curl -X POST http://localhost:8002/replay -H 'Content-Type: application/json' -d '{\"limit\": 50}'"
+echo "  • Query drift metrics: curl http://localhost:8000/metrics | grep drift_"
+echo "  • Test replay API: curl -X POST http://localhost:8002/replay?limit=5"
+echo "  • View logs: docker compose logs -f <service>"
 
 echo -e "\n${YELLOW}To stop the system:${NC}"
-echo "  cd infra && podman-compose down"
+echo "  cd infra && docker compose down"
 
-echo -e "\n${GREEN}═══════════════════════════════════════════════════════════${NC}\n"
+echo -e "\n${YELLOW}To clean up everything (remove volumes):${NC}"
+echo "  cd infra && docker compose down -v"
 
-# Cleanup temporary files
-rm -f /tmp/run_generator.py /tmp/run_generator_drift.py
+echo -e "\n${GREEN}═════════════════════════════════════════════════════════════${NC}\n"
 
 print_success "Demo script completed successfully!"
-
-# Made with Bob

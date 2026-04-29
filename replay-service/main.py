@@ -51,6 +51,8 @@ class ReplayResponse(BaseModel):
     comparisons: List[ComparisonResult]
     model_version: Optional[str] = None
 
+    model_config = {"protected_namespaces": ()}
+
 
 def get_db_connection():
     """Get PostgreSQL database connection"""
