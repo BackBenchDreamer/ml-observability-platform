@@ -2,6 +2,8 @@
 
 FastAPI-based inference service that provides ML predictions and publishes events to Redis Streams for observability.
 
+> **Note**: This service supports both Docker and Podman container runtimes.
+
 ## Overview
 
 This service:
@@ -136,20 +138,42 @@ Each prediction publishes an event to Redis Stream `ml-events` with the followin
 
    The service will be available at `http://localhost:8001`
 
-### Option 2: With Podman Compose (Production)
+### Option 2: With Container Compose (Production)
 
 1. **Start all services:**
+   
+   Docker:
    ```bash
    cd infra
-   podman-compose up -d
+   docker compose -f docker-compose.yml up -d
+   ```
+   
+   Podman:
+   ```bash
+   cd infra
+   podman-compose -f podman-compose.yml up -d
    ```
 
 2. **Check service status:**
+   
+   Docker:
+   ```bash
+   docker compose ps
+   ```
+   
+   Podman:
    ```bash
    podman-compose ps
    ```
 
 3. **View logs:**
+   
+   Docker:
+   ```bash
+   docker compose logs -f inference-api
+   ```
+   
+   Podman:
    ```bash
    podman-compose logs -f inference-api
    ```
@@ -184,6 +208,12 @@ curl -X POST http://localhost:8001/predict \
 
 Check that the prediction event was published to Redis:
 
+Docker:
+```bash
+docker exec -it ml-obs-redis redis-cli XREAD COUNT 5 STREAMS ml-events 0
+```
+
+Podman:
 ```bash
 podman exec -it ml-obs-redis redis-cli XREAD COUNT 5 STREAMS ml-events 0
 ```
@@ -243,11 +273,25 @@ curl -X POST http://localhost:8001/predict \
 ### Service won't start
 
 1. Check Redis is running:
+   
+   Docker:
+   ```bash
+   docker ps | grep redis
+   ```
+   
+   Podman:
    ```bash
    podman ps | grep redis
    ```
 
 2. Check logs:
+   
+   Docker:
+   ```bash
+   docker compose logs inference-api
+   ```
+   
+   Podman:
    ```bash
    podman-compose logs inference-api
    ```
@@ -256,6 +300,13 @@ curl -X POST http://localhost:8001/predict \
 
 1. Verify Redis host/port in environment variables
 2. Check network connectivity:
+   
+   Docker:
+   ```bash
+   docker exec -it ml-obs-inference-api ping redis
+   ```
+   
+   Podman:
    ```bash
    podman exec -it ml-obs-inference-api ping redis
    ```

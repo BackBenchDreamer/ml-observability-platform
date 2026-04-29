@@ -2,6 +2,8 @@
 
 A production-grade real-time ML drift detection service that monitors data and prediction distributions using statistical methods.
 
+> **Note**: This service supports both Docker and Podman container runtimes.
+
 ## Overview
 
 The drift-service is a long-running Python service that consumes ML inference events from Redis Streams, performs statistical drift detection, and publishes alerts when distribution shifts are detected. It's a critical component of the ML observability platform, enabling early detection of model degradation and data quality issues.
@@ -167,9 +169,14 @@ The service is configured via environment variables. See [`.env.example`](.env.e
 
 3. **Ensure Redis is running**:
    ```bash
-   # If using Podman Compose infrastructure
+   # If using container infrastructure
    cd ../infra
-   podman-compose up -d redis
+   
+   # Docker:
+   docker compose -f docker-compose.yml up -d redis
+   
+   # Podman:
+   podman-compose -f podman-compose.yml up -d redis
    ```
 
 4. **Run the service**:
@@ -177,33 +184,70 @@ The service is configured via environment variables. See [`.env.example`](.env.e
    python3 main.py
    ```
 
-### With Podman Compose
+### With Container Compose
 
 **Start all services** (recommended):
+
+Docker:
+```bash
+cd infra
+docker compose -f docker-compose.yml up -d
+```
+
+Podman:
 ```bash
 cd infra
 podman-compose -f podman-compose.yml up -d
 ```
 
 **Start only drift-service**:
+
+Docker:
+```bash
+cd infra
+docker compose -f docker-compose.yml up -d drift-service
+```
+
+Podman:
 ```bash
 cd infra
 podman-compose -f podman-compose.yml up -d drift-service
 ```
 
 **View logs**:
+
+Docker:
 ```bash
-podman-compose -f podman-compose.yml logs -f drift-service
+docker compose -f infra/docker-compose.yml logs -f drift-service
+```
+
+Podman:
+```bash
+podman-compose -f infra/podman-compose.yml logs -f drift-service
 ```
 
 **Restart service**:
+
+Docker:
 ```bash
-podman-compose -f podman-compose.yml restart drift-service
+docker compose -f infra/docker-compose.yml restart drift-service
+```
+
+Podman:
+```bash
+podman-compose -f infra/podman-compose.yml restart drift-service
 ```
 
 **Stop service**:
+
+Docker:
 ```bash
-podman-compose -f podman-compose.yml stop drift-service
+docker compose -f infra/docker-compose.yml stop drift-service
+```
+
+Podman:
+```bash
+podman-compose -f infra/podman-compose.yml stop drift-service
 ```
 
 ## API Endpoints
@@ -387,6 +431,13 @@ Alerts are published to the `ml-alerts` Redis Stream with the following structur
 
 ### Consuming Alerts
 
+**Docker:**
+```bash
+# Read alerts from Redis
+docker exec ml-obs-redis redis-cli XREAD COUNT 10 STREAMS ml-alerts 0
+```
+
+**Podman:**
 ```bash
 # Read alerts from Redis
 podman exec ml-obs-redis redis-cli XREAD COUNT 10 STREAMS ml-alerts 0
@@ -436,11 +487,25 @@ Both formats are automatically detected and parsed by [`consumer.py`](consumer.p
 
 **Solutions**:
 1. Verify Redis is running:
+   
+   Docker:
+   ```bash
+   docker compose ps redis
+   ```
+   
+   Podman:
    ```bash
    podman-compose ps redis
    ```
 
 2. Check Redis connectivity:
+   
+   Docker:
+   ```bash
+   docker exec ml-obs-redis redis-cli ping
+   ```
+   
+   Podman:
    ```bash
    podman exec ml-obs-redis redis-cli ping
    ```
@@ -456,6 +521,13 @@ Both formats are automatically detected and parsed by [`consumer.py`](consumer.p
 **Solutions**:
 1. Verify event format matches expected schema
 2. Check Redis stream contents:
+   
+   Docker:
+   ```bash
+   docker exec ml-obs-redis redis-cli XREAD COUNT 1 STREAMS ml-events 0
+   ```
+   
+   Podman:
    ```bash
    podman exec ml-obs-redis redis-cli XREAD COUNT 1 STREAMS ml-events 0
    ```
@@ -528,6 +600,13 @@ python3 main.py
 ```
 
 **Container logs**:
+
+Docker:
+```bash
+docker compose logs -f drift-service
+```
+
+Podman:
 ```bash
 podman-compose logs -f drift-service
 ```
@@ -554,6 +633,13 @@ For testing drift detection:
 ### Testing with Data Generator
 
 1. Start infrastructure:
+   
+   Docker:
+   ```bash
+   cd infra && docker compose up -d
+   ```
+   
+   Podman:
    ```bash
    cd infra && podman-compose up -d
    ```

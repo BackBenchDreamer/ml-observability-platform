@@ -46,7 +46,9 @@ Environment variables:
 
 ### Prerequisites
 - Python 3.11+
-- Redis running (see `infra/podman-compose.yml`)
+- Redis running (see `infra/docker-compose.yml` or `infra/podman-compose.yml`)
+
+> **Note**: This service works with both Docker and Podman container runtimes.
 
 ### Install Dependencies
 ```bash
@@ -73,15 +75,34 @@ EVENT_INTERVAL=0.5 \
 python3 generator.py
 ```
 
-## Running with Podman
+## Running with Containers
 
 ### Build Image
+
+**Docker:**
+```bash
+cd data-generator
+docker build -t ml-data-generator .
+```
+
+**Podman:**
 ```bash
 cd data-generator
 podman build -t ml-data-generator .
 ```
 
 ### Run Container (Normal Mode)
+
+**Docker:**
+```bash
+docker run --rm \
+  --network ml-observability-platform_default \
+  -e REDIS_HOST=redis \
+  -e REDIS_PORT=6379 \
+  ml-data-generator
+```
+
+**Podman:**
 ```bash
 podman run --rm \
   --network ml-observability-platform_default \
@@ -91,6 +112,18 @@ podman run --rm \
 ```
 
 ### Run Container (Drift Mode)
+
+**Docker:**
+```bash
+docker run --rm \
+  --network ml-observability-platform_default \
+  -e REDIS_HOST=redis \
+  -e REDIS_PORT=6379 \
+  -e ENABLE_DRIFT=true \
+  ml-data-generator
+```
+
+**Podman:**
 ```bash
 podman run --rm \
   --network ml-observability-platform_default \
@@ -111,6 +144,23 @@ When `ENABLE_DRIFT=true`:
 ## Verifying Events in Redis
 
 ### Using Redis CLI
+
+**Docker:**
+```bash
+# Connect to Redis
+docker exec -it ml-obs-redis redis-cli
+
+# Read latest events from stream
+XREAD COUNT 10 STREAMS ml-events 0
+
+# Get stream info
+XINFO STREAM ml-events
+
+# Get stream length
+XLEN ml-events
+```
+
+**Podman:**
 ```bash
 # Connect to Redis
 podman exec -it ml-obs-redis redis-cli
@@ -164,9 +214,11 @@ Example output:
 ## Troubleshooting
 
 ### Cannot connect to Redis
-- Ensure Redis is running: `podman ps | grep redis`
+- Ensure Redis is running:
+  - Docker: `docker ps | grep redis`
+  - Podman: `podman ps | grep redis`
 - Check Redis host/port configuration
-- Verify network connectivity (use correct Podman network if containerized)
+- Verify network connectivity (use correct network if containerized)
 
 ### Import errors
 - Install dependencies: `python3 -m pip install -r requirements.txt`
@@ -180,7 +232,9 @@ Example output:
 ## Next Steps
 
 After starting the generator:
-1. Verify events are being published: `podman exec -it ml-obs-redis redis-cli XLEN ml-events`
+1. Verify events are being published:
+   - Docker: `docker exec -it ml-obs-redis redis-cli XLEN ml-events`
+   - Podman: `podman exec -it ml-obs-redis redis-cli XLEN ml-events`
 2. Implement the observer-engine service to consume these events
 3. Test drift detection by toggling `ENABLE_DRIFT`
 4. Monitor event generation rate and Redis stream growth

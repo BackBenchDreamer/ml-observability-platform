@@ -2,16 +2,30 @@
 
 ## Prerequisites
 
-- Podman
-- podman-compose
+- Docker or Podman (container runtime)
+- docker compose or podman-compose
 - python3
 - curl
 
+> **Note**: This platform supports both Docker and Podman. Commands below show both alternatives where applicable. The provided scripts (like `demo.sh`) automatically detect your runtime.
+
 ## Start system
 
+**Option 1: Using the demo script (recommended - auto-detects runtime):**
+```bash
+./scripts/demo.sh
+```
+
+**Option 2: Manual startup:**
 ```bash
 cd infra
 cp ..\.env.example .env
+
+# Docker:
+docker compose -f docker-compose.yml up -d
+docker compose -f docker-compose.yml ps
+
+# Podman:
 podman-compose -f podman-compose.yml up -d
 podman-compose -f podman-compose.yml ps
 ```
@@ -57,6 +71,12 @@ Key metrics:
 
 ```bash
 curl http://localhost:9090/alerts
+
+# View webhook receiver logs:
+# Docker:
+docker compose -f infra/docker-compose.yml logs webhook-receiver
+
+# Podman:
 podman-compose -f infra/podman-compose.yml logs webhook-receiver
 ```
 
@@ -82,6 +102,13 @@ Expected response fields:
 Use targeted restarts to validate recovery:
 
 ```bash
+# Docker:
+docker compose -f infra/docker-compose.yml restart redis
+docker compose -f infra/docker-compose.yml restart postgres
+docker compose -f infra/docker-compose.yml restart inference-api
+docker compose -f infra/docker-compose.yml restart drift-service
+
+# Podman:
 podman-compose -f infra/podman-compose.yml restart redis
 podman-compose -f infra/podman-compose.yml restart postgres
 podman-compose -f infra/podman-compose.yml restart inference-api
@@ -102,5 +129,10 @@ After each restart:
 
 ```bash
 cd infra
+
+# Docker:
+docker compose -f docker-compose.yml down
+
+# Podman:
 podman-compose -f podman-compose.yml down
 ```

@@ -2,18 +2,36 @@
 
 Production-style ML observability system for streaming inference events, detecting drift, and replaying historical predictions.
 
+## Runtime Compatibility
+
+This platform seamlessly supports both **Docker** and **Podman** container runtimes without requiring manual configuration.
+
+### Automatic Detection
+- Runtime is automatically detected when you run any script
+- No environment variables or configuration files needed
+- Works with Docker Compose V2 (`docker compose`), legacy Docker Compose (`docker-compose`), and Podman Compose (`podman-compose`)
+
+### Usage
+Simply run the provided scripts - they will automatically use the correct runtime:
+```bash
+./scripts/demo.sh
+./scripts/rebuild-all-services.sh
+```
+
+The system uses a runtime abstraction layer ([`scripts/runtime.sh`](scripts/runtime.sh)) that detects your container runtime and configures all commands accordingly.
+
 ## Quick start
 
 Prerequisites:
-- Podman
-- podman-compose
+- Docker or Podman
+- Docker Compose or Podman Compose
 - python3
 
 ```bash
 cd infra
 cp ..\.env.example .env
-podman-compose -f podman-compose.yml up -d
-podman-compose -f podman-compose.yml ps
+# The compose command will be auto-detected (docker compose, docker-compose, or podman-compose)
+./scripts/demo.sh
 ```
 
 Run end-to-end demo:

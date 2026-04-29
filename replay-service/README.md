@@ -2,6 +2,8 @@
 
 FastAPI service for replaying historical ML events through the inference API to compare model predictions.
 
+> **Note**: This service supports both Docker and Podman container runtimes.
+
 ## Features
 
 - Fetch historical events from PostgreSQL database
@@ -73,13 +75,32 @@ python3 main.py
 
 Service runs on port 8002.
 
-## Running with Podman
+## Running with Containers
 
+### Build Image
+
+**Docker:**
 ```bash
-# Build image
-podman build -t replay-service .
+docker build -t replay-service .
+```
 
-# Run container
+**Podman:**
+```bash
+podman build -t replay-service .
+```
+
+### Run Container
+
+**Docker:**
+```bash
+docker run -p 8002:8002 \
+  -e POSTGRES_HOST=postgres \
+  -e INFERENCE_API_URL=http://inference-api:8001 \
+  replay-service
+```
+
+**Podman:**
+```bash
 podman run -p 8002:8002 \
   -e POSTGRES_HOST=postgres \
   -e INFERENCE_API_URL=http://inference-api:8001 \

@@ -196,7 +196,7 @@ Alert:
 # DRIFT LOGIC
 
 Phase 1 — Infra
-* Podman setup
+* Container runtime setup (Docker or Podman)
 * Redis, Prometheus, Grafana, Postgres
 * Health check: Grafana shows something
 
@@ -238,29 +238,35 @@ Returns:
 
 ---
 
-# CONTAINERIZATION (IMPORTANT: PODMAN ONLY)
+# CONTAINERIZATION
 
-DO NOT use Docker.
+**Runtime Support**: This platform supports both Docker and Podman.
 
 Use:
 
-* `podman-compose` (preferred)
-  OR
-* compatible podman-compose syntax
+* `docker compose` (Docker)
+* `podman-compose` (Podman)
 
 Requirements:
 
-* Generate `podman-compose.yml` that works with Podman
+* Generate both `docker-compose.yml` and `podman-compose.yml`
 * Ensure:
 
-  * No Docker-specific features that break Podman
-  * Rootless-compatible configs
-  * Proper networking
+  * Runtime-agnostic configurations
+  * Rootless-compatible configs (for Podman)
+  * Proper networking for both runtimes
 
-Provide run command:
+Provide run commands:
 
 ```bash
+# Docker:
+docker compose up
+
+# Podman:
 podman-compose up
+
+# Or use the provided scripts (auto-detect runtime):
+./scripts/demo.sh
 ```
 
 ---
@@ -269,10 +275,11 @@ podman-compose up
 
 Generate:
 
-1. podman-compose.yml (Podman compatible)
-2. prometheus.yml
-3. Grafana provisioning (basic)
-4. Volume persistence (Postgres, Prometheus)
+1. docker-compose.yml (Docker compatible)
+2. podman-compose.yml (Podman compatible)
+3. prometheus.yml
+4. Grafana provisioning (basic)
+5. Volume persistence (Postgres, Prometheus)
 
 ---
 
@@ -284,16 +291,20 @@ ml-observability-platform/
 ├── observer-engine/
 ├── replay-service/
 ├── infra/
+│   ├── docker-compose.yml
 │   ├── podman-compose.yml
 │   ├── prometheus.yml
 │   └── grafana/
+├── scripts/
+│   ├── demo.sh
+│   └── runtime.sh
 └── README.md
 
 ---
 
 # EXECUTION STRATEGY
 
-Phase 1: Infra (Podman + Redis + Prometheus + Grafana + Postgres)
+Phase 1: Infra (Container runtime + Redis + Prometheus + Grafana + Postgres)
 Phase 2: Data generator + Redis stream
 Phase 3: Inference API
 Phase 4: Observer engine + metrics
@@ -333,10 +344,11 @@ Phase 1 → Infrastructure Setup
 
 Provide:
 
-1. podman-compose.yml (Podman-compatible)
-2. prometheus.yml
-3. Instructions to run with podman-compose
-4. Commit message + git commands
-5. README update
+1. docker-compose.yml (Docker-compatible)
+2. podman-compose.yml (Podman-compatible)
+3. prometheus.yml
+4. Instructions to run with either runtime
+5. Commit message + git commands
+6. README update
 
 If any ambiguity exists, ask before proceeding.
