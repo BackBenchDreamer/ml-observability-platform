@@ -11,7 +11,7 @@ route:
 receivers:
   - name: 'webhook'
     webhook_configs:
-      - url: 'http://webhook-receiver:5000/alert'
+      - url: 'http://webhook-receiver:5001/alert'
         send_resolved: true
 
 # Made with Bob

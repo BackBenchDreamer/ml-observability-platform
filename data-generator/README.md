@@ -21,7 +21,7 @@ Each generated event includes:
 - `features`: 
   - `feature_1`: float (normal distribution)
   - `feature_2`: float (normal distribution)
-  - `is_premium_user`: boolean (random)
+  - `feature_3`: float (normal distribution)
 - `prediction`:
   - `label`: integer (0 or 1, random)
   - `confidence`: float (0.7-0.99, random)
@@ -51,7 +51,7 @@ Environment variables:
 ### Install Dependencies
 ```bash
 cd data-generator
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 ### Run Generator (Normal Mode)
@@ -169,7 +169,7 @@ Example output:
 - Verify network connectivity (use correct Podman network if containerized)
 
 ### Import errors
-- Install dependencies: `pip install -r requirements.txt`
+- Install dependencies: `python3 -m pip install -r requirements.txt`
 - Verify Python version: `python3 --version` (should be 3.11+)
 
 ### Events not appearing in stream

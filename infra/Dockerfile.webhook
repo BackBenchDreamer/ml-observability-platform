@@ -9,8 +9,8 @@ RUN pip install --no-cache-dir -r webhook_requirements.txt
 # Copy the webhook receiver application
 COPY webhook_receiver.py .
 
-# Expose port 5000
-EXPOSE 5000
+# Expose port 5001
+EXPOSE 5001
 
 # Run the webhook receiver
-CMD ["python", "webhook_receiver.py"]
+CMD ["python3", "webhook_receiver.py"]

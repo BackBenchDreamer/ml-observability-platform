@@ -622,16 +622,11 @@ for stream, msgs in messages:
 
 ## Related Documentation
 
-- [Phase 4 Documentation](../docs/PHASE_4.md) - Complete phase implementation details
 - [Project README](../README.md) - Platform overview
-- [Phase 1 Documentation](../docs/PHASE_1.md) - Infrastructure setup
-- [Phase 2 Documentation](../docs/PHASE_2.md) - Data generator
+- [Architecture](../docs/ARCHITECTURE.md) - System design and flow
+- [Testing](../docs/TESTING.md) - Validation workflow
 - [Inference API Documentation](../inference-api/README.md) - Inference service
 
 ## License
 
 See [LICENSE](../LICENSE).
-
----
-
-**Made with Bob** 🤖

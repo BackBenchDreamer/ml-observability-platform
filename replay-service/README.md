@@ -61,7 +61,7 @@ Environment variables (see `.env.example`):
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 
 # Set environment variables
 cp .env.example .env
@@ -73,7 +73,7 @@ python3 main.py
 
 Service runs on port 8002.
 
-## Running with Docker/Podman
+## Running with Podman
 
 ```bash
 # Build image

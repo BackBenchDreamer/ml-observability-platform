@@ -1,14 +1,12 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
     container_name: ml-obs-redis
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -25,13 +23,13 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: ml_observability
-      POSTGRES_USER: mlobs
-      POSTGRES_PASSWORD: mlobs_pass
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mlobs -d ml_observability"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,9 +48,8 @@ services:
       - ./alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 15s
@@ -71,8 +68,7 @@ services:
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
       interval: 15s
@@ -90,20 +86,8 @@ services:
     container_name: ml-obs-webhook-receiver
     ports:
       - "5001:5001"
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      ALERT_STREAM_NAME: ml-alerts
-      LOG_LEVEL: INFO
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5001/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     restart: unless-stopped
     networks:
       - ml-obs-network
@@ -114,20 +98,19 @@ services:
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 15s
-    depends_on:
-      prometheus:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - ml-obs-network
@@ -139,21 +122,20 @@ services:
     container_name: ml-obs-inference-api
     ports:
       - "8001:8001"
+    env_file:
+      - ../inference-api/.env.example
     environment:
       REDIS_HOST: redis
-      REDIS_PORT: 6379
-      MODEL_VERSION: 1.0.0
-      LOG_LEVEL: INFO
-      ENVIRONMENT: production
+      REDIS_PORT: ${REDIS_PORT}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      - redis
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8001/health"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 20s
-    depends_on:
-      redis:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - ml-obs-network
@@ -165,36 +147,25 @@ services:
     container_name: ml-obs-drift-service
     ports:
       - "8000:8000"
+    env_file:
+      - ../drift-service/.env.example
     environment:
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: ${REDIS_PORT}
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ml_observability
-      POSTGRES_USER: mlobs
-      POSTGRES_PASSWORD: mlobs_pass
-      STREAM_NAME: ml-events
-      ALERT_STREAM_NAME: ml-alerts
-      CONSUMER_GROUP: drift-detector
-      CONSUMER_NAME: drift-worker-1
-      BASELINE_WINDOW_SIZE: 100
-      SLIDING_WINDOW_SIZE: 100
-      DRIFT_THRESHOLD_PSI: 0.2
-      DRIFT_THRESHOLD_KS: 0.05
-      CHECK_INTERVAL_MS: 1000
-      METRICS_PORT: 8000
-      LOG_LEVEL: INFO
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      - redis
+      - postgres
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/health"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 30s
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - ml-obs-network
@@ -206,25 +177,24 @@ services:
     container_name: ml-obs-replay-service
     ports:
       - "8002:8002"
+    env_file:
+      - ../replay-service/.env.example
     environment:
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ml_observability
-      POSTGRES_USER: mlobs
-      POSTGRES_PASSWORD: mlobs_pass
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       INFERENCE_API_URL: http://inference-api:8001
-      LOG_LEVEL: INFO
+    depends_on:
+      - postgres
+      - inference-api
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8002/health"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 30s
-    depends_on:
-      postgres:
-        condition: service_healthy
-      inference-api:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - ml-obs-network
@@ -234,35 +204,24 @@ services:
       context: ../data-generator
       dockerfile: Dockerfile
     container_name: ml-obs-data-generator
-    working_dir: /app
+    env_file:
+      - ../data-generator/.env.example
     environment:
-      INFERENCE_API_URL: http://inference-api:8001
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: ${REDIS_PORT}
       STREAM_NAME: ml-events
-      GENERATION_RATE: 10
-      DRIFT_START_AFTER: 300
-      DRIFT_MAGNITUDE: 0.5
-      LOG_LEVEL: INFO
     depends_on:
-      inference-api:
-        condition: service_healthy
+      - redis
     restart: unless-stopped
     networks:
       - ml-obs-network
 
 volumes:
   redis-data:
-    driver: local
   postgres-data:
-    driver: local
   prometheus-data:
-    driver: local
   grafana-data:
-    driver: local
 
 networks:
   ml-obs-network:
     driver: bridge
-
-# Made with Bob
