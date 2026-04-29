@@ -3,20 +3,19 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INFRA_DIR="$ROOT_DIR/infra"
+source "$ROOT_DIR/scripts/runtime.sh"
 
 echo "[STEP] Checking prerequisites"
-command -v podman >/dev/null 2>&1 || { echo "[ERROR] podman not found"; exit 1; }
-command -v podman-compose >/dev/null 2>&1 || { echo "[ERROR] podman-compose not found"; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "[ERROR] python3 not found"; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "[ERROR] curl not found"; exit 1; }
+echo "[STEP] Using runtime: $CONTAINER_RUNTIME ($COMPOSE_CMD, $COMPOSE_FILE)"
 
 echo "[STEP] Starting platform"
-cd "$INFRA_DIR"
-if [[ ! -f .env ]]; then
-  cp "$ROOT_DIR/.env.example" .env
+if [[ ! -f "$INFRA_DIR/.env" ]]; then
+  cp "$ROOT_DIR/.env.example" "$INFRA_DIR/.env"
 fi
-podman-compose -f podman-compose.yml down >/dev/null 2>&1 || true
-podman-compose -f podman-compose.yml up -d
+$COMPOSE_CMD -f "$INFRA_DIR/$COMPOSE_FILE" down >/dev/null 2>&1 || true
+$COMPOSE_CMD -f "$INFRA_DIR/$COMPOSE_FILE" up -d
 
 echo "[STEP] Waiting for services"
 sleep 30
@@ -50,6 +49,9 @@ echo "[STEP] Generating drift traffic (20s)"
 
 echo "[STEP] Drift metrics snapshot"
 curl -s http://localhost:8000/metrics | grep -E "ml_drift_score|drift_detected_total|drift_psi_score" || true
+
+echo "[STEP] Redis stream depth"
+$EXEC_CMD exec ml-obs-redis redis-cli XLEN ml-events || true
 
 echo "[STEP] Replay check"
 curl -s -X POST "http://localhost:8002/replay?limit=5" | python3 -m json.tool || true

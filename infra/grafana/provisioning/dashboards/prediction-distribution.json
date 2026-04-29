@@ -94,7 +94,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "total_predictions",
+          "expr": "total_predictions_total",
           "legendFormat": "Predictions",
           "range": true,
           "refId": "A"
@@ -177,7 +177,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(total_predictions[1m])",
+          "expr": "rate(total_predictions_total[1m])",
           "legendFormat": "Predictions/min",
           "range": true,
           "refId": "A"
@@ -236,7 +236,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "total_predictions",
+          "expr": "total_predictions_total",
           "legendFormat": "Total",
           "range": true,
           "refId": "A"

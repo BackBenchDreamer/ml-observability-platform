@@ -94,14 +94,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(inference_latency_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(drift_processing_latency_seconds_bucket[5m])) by (le))",
           "legendFormat": "P50",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(inference_latency_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(drift_processing_latency_seconds_bucket[5m])) by (le))",
           "legendFormat": "P95",
           "range": true,
           "refId": "B"
@@ -184,7 +184,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(total_predictions[1m])",
+          "expr": "rate(total_predictions_total[1m])",
           "legendFormat": "Throughput",
           "range": true,
           "refId": "A"
@@ -251,7 +251,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(inference_latency_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(drift_processing_latency_seconds_bucket[5m])) by (le))",
           "legendFormat": "P95 Latency",
           "range": true,
           "refId": "A"
