@@ -19,26 +19,20 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Observer Engine (Phase 4)
-  # Monitors ML model predictions and detects drift
-  - job_name: 'observer-engine'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['observer-engine:8001']
-
   # Inference API (Phase 3)
   # Serves ML model predictions
   - job_name: 'inference-api'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['inference-api:8000']
+      - targets: ['inference-api:8001']
 
   # Data Generator (Phase 2)
   # Generates synthetic data for testing
-  - job_name: 'data-generator'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['data-generator:8002']
+  # DISABLED: data-generator does not expose metrics endpoint
+  # - job_name: 'data-generator'
+  #   metrics_path: '/metrics'
+  #   static_configs:
+  #     - targets: ['data-generator:8002']
 
   # Drift Service (Phase 4)
   # Detects data drift in ML predictions

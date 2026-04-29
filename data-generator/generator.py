@@ -26,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration from environment variables
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
 REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
 ENABLE_DRIFT = os.getenv('ENABLE_DRIFT', 'false').lower() == 'true'
 EVENT_INTERVAL = float(os.getenv('EVENT_INTERVAL', 1.0))
